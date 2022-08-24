@@ -2,11 +2,10 @@
     "Version": "2012-10-17",
     "Statement": [
         {
+            "Sid": "AllowS3GetObject",
             "Effect": "Allow",
-            "Action": [
-                "s3:GetObject"
-            ],
-            "Resource": "arn:aws:s3_bucket_here"
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::iosupdateinventory/*"
         }
     ]
 }
