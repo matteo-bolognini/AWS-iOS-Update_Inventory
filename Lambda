@@ -1,0 +1,68 @@
+import requests
+import json
+import boto3
+import base64
+s3 = boto3.client('s3')
+
+def lambda_handler(event, context):
+
+    #Define the Jamf Pro URL
+    jamf_url = "https://yourinstance.jamfcloud.com"
+    
+    #Define the S3 bucket name(bucket) and filename(key)
+    S3_Bucket = "Name_of_the_S3_bucket"
+    S3_Key = "my_picture.gif"
+    SecretManagerId = "prod/JamfProAPI"
+    ErrorText = "We hit a snag! Please open a ticket to HelpDesk"
+    
+    #######################################################################################
+    ################################# DO NOT MODIFY BELOW #################################
+    #######################################################################################
+    
+    #Extract the device id from the API call HTTP header
+    jss_id = event['queryStringParameters']['device_id']
+    
+    #Invoke Secrets Manager to obtain Jamf Pro API username and password
+    client = boto3.client("secretsmanager")
+    response = client.get_secret_value(SecretId="SecretManagerId")
+    secretDict = json.loads(response["SecretString"])
+    jamf_api_username = secretDict["username"]
+    jamf_api_password = secretDict["password"]
+    
+    #Invoke Jamf Pro API /token enpoint
+    token_url = f"{jamf_url}/api/v1/auth/token"
+    headers = {"Accept": "application/json"}
+    resp = requests.post(token_url, auth=(jamf_api_username, jamf_api_password), headers=headers)
+    resp.raise_for_status()
+    resp_data = resp.json()
+    print(f"Jamf Pro Access Token granted, valid until {resp_data['expires']}.")
+    data = resp.json()
+    token = data["token"]
+    
+    jamf_pro_resp = requests.post(
+        f"{jamf_url}/JSSResource/mobiledevicecommands/command/UpdateInventory/id/{jss_id}",
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        )
+    
+    if jamf_pro_resp.status_code != 401:
+        response = s3.get_object(
+            Bucket = (S3_Bucket),
+            Key = (S3_Key),
+            )
+        image = response['Body'].read()
+        return {
+            'headers': { "Content-Type": "image/png" },
+            'statusCode': 200,
+            'body': base64.b64encode(image).decode('utf-8'),
+            'isBase64Encoded': True
+            
+        }
+        print(f"Inventory Update successfully requested - HTTP response: {jamf_pro_resp.status_code}")
+    else:
+        return {
+            'headers': { "Content-type": "text/html" },
+            'statusCode': 200,
+            'body': "<h1>(ErrorText)</h1>",
+            
+        }     
+        print(f"Check your credentials <POST failed> Jamf Pro API HTTP response: {jamf_pro_resp.status_code}")
