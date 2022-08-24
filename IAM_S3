@@ -5,7 +5,7 @@
             "Sid": "AllowS3GetObject",
             "Effect": "Allow",
             "Action": "s3:GetObject",
-            "Resource": "arn:aws:s3:::iosupdateinventory/*"
+            "Resource": "arn:aws:s3:::$bucket_name_here/*"
         }
     ]
 }
